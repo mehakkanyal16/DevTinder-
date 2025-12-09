@@ -3,6 +3,8 @@ const app=express();
 const connectDB=require('./config/db');
 const dotenv=require('dotenv');
 const User=require('./models/user');
+const {validateSignUpData}=require('./utils/validation');
+const bcrypt = require('bcrypt');
 dotenv.config();
 
 const PORT=process.env.PORT || 5000;
@@ -13,15 +15,27 @@ app.use(express.json());
 // app.use('/',(req,res)=>{
 //   res.send("Hello World");
 // })
-app.post('/user',(req,res)=>{
+app.post('/signup',async(req,res)=>{
+  
   try{
-    const {firstName,lastName,email,password,age,gender}=req.body;
-    const newUser=new User({firstName,
+   
+    //validations 
+    validateSignUpData(req);  
+
+     const {firstName,lastName,email,password}=req.body;
+
+    //Encrptying password 
+ 
+    const passwordHash= await bcrypt.hash(password,10);
+    console.log("hashed password :",passwordHash);
+
+    //Creating user
+    const newUser=new User({
+    firstName,
     lastName,
     email,
-    password,
-    age,
-    gender}); 
+    password:passwordHash,
+    }); 
     newUser.save().then((user)=>{
       res.status(201).json({
         success:true,
@@ -30,13 +44,37 @@ app.post('/user',(req,res)=>{
       });
     })
   }catch(err){
-    console.error("Error in /test route:", err);
-    res.status(500).json({ message: "Internal Server Error", error: err.message });
+    console.error("Error in /signup route:", err);
+    res.status(500).json({ message: "Validation Failed", error: err.message });
 
   }
   
    
 });
+
+app.post('/login',async(req,res)=>{
+  try{
+    const {email,password}=req.body;
+    const user=await User.findOne({email:email});
+    if(!user){
+      return res.status(404).json({message:"User not found"});
+    }
+    const isPasswordValid=await bcrypt.compare(password,user.password);
+    if(!isPasswordValid){
+      return res.status(401).json({message:"Invalid credentials"});
+    }
+    res.status(200).json({
+      success:true,
+      message:"Login successful",
+      // data:user,
+    });
+      
+
+  }catch(err){
+    console.error("Error in /login route:", err);
+    res.status(500).json({ message: "Internal Server Error", error: err.message });
+  }
+})
 
 app.delete('/user',async(req,res)=>{
   try{
