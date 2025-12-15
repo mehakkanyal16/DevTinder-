@@ -2,20 +2,23 @@ const express = require("express");
 const app = express();
 const connectDB = require("./config/db");
 const dotenv = require("dotenv");
+const cookieParser = require("cookie-parser");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+dotenv.config();
+app.use(express.json());
+app.use(cookieParser());
+
 const User = require("./models/user");
 const { validateSignUpData } = require("./utils/validation");
-const bcrypt = require("bcrypt");
-dotenv.config();
-const cookieParser = require("cookie-parser");
-app.use(cookieParser());
-const jwt=require("jsonwebtoken");
-const user = require("./models/user");
 const {userAuth} = require("./middlewares/auth");
+
 
 
 const PORT = process.env.PORT || 5000;
 
-app.use(express.json());
+
 
 // app.use('/',(req,res)=>{
 //   res.send("Hello World");
@@ -23,7 +26,7 @@ app.use(express.json());
 
 app.get("/profile",userAuth, async(req, res) => {
    try {
-    const { token } = req.cookies;
+    // const { token } = req.cookies;
 
   
     const user=req.user;
@@ -41,7 +44,10 @@ app.get("/profile",userAuth, async(req, res) => {
   } 
 
 });
-app.post("/signup", async (req, res) => {
+
+
+ app.post("/signup", async (req, res) => {
+   
   try {
     //validations
     validateSignUpData(req);
@@ -81,18 +87,22 @@ app.post("/login", async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await user.validatePassword(password);
     if (isPasswordValid) {
 
       //create jwt token
-      const token = jwt.sign({ _id: user._id },process.env.JWT_SECRET, {
-        expiresIn: "1h",
-      }); 
-      console.log("JWT Token:", token);
+      // const token = jwt.sign({ _id: user._id },process.env.JWT_SECRET, {
+      //   expiresIn: "1h",
+      // }); 
+     
+      const token = user.getJWT();
       
 
       // Add the token to cookie and send the response back to user
-      res.cookie("token", token);
+      res.cookie("token", token,{
+        expires: new Date(Date.now() + 8 * 3600000), // 8 hours
+      });
       console.log(token);
 
       res.status(200).json({
@@ -167,7 +177,7 @@ app.post("/login", async (req, res) => {
 //   }
 // });
 
-app.post("/sendConnectionRequest",async(req,res)=>{
+app.post("/sendConnectionRequest",userAuth ,async(req,res)=>{
   try{
 
     console.log("sending connection request");
